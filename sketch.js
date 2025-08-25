@@ -2,14 +2,15 @@
 // Tác giả: Gemini
 
 let fontRegular;
-let playButton, resetButton, instructionsButton, overlapButton, sphereButton, labelButton;
+let playButton, resetButton, instructionsButton, overlapButton, sphereButton, labelButton, spinButton;
 let titleDiv, footerDiv, instructionsPopup;
 let atoms = [];
 let state = "idle";
 let progress = 0;
 let bondingProgress = 0;
 let cloudRotationAngle = 0;
-let showLabels = false;
+let showLabels = true; // Đặt true để nhãn hiển thị từ đầu
+let isSpinning = true; // Đặt true để electron quay từ đầu
 
 const slowSpinSpeed = 0.025;
 const fastSpinSpeed = 0.15;
@@ -77,10 +78,21 @@ function createUI() {
         }
     });
 
+    spinButton = createButton("Tắt quay electron");
+    styleButton(spinButton);
+    spinButton.mousePressed(() => {
+        isSpinning = !isSpinning;
+        if (isSpinning) {
+            spinButton.html("Tắt quay electron");
+        } else {
+            spinButton.html("Bật quay electron");
+        }
+    });
+
     resetButton = createButton("↺ Reset");
     styleButton(resetButton);
     resetButton.mousePressed(() => {
-        resetSimulation();
+        window.location.reload();
     });
 
     overlapButton = createButton("Bật xen phủ");
@@ -115,7 +127,7 @@ function createUI() {
         }
     });
 
-    labelButton = createButton("Bật nhãn");
+    labelButton = createButton("Tắt nhãn");
     styleButton(labelButton);
     labelButton.mousePressed(() => {
         showLabels = !showLabels;
@@ -172,7 +184,7 @@ function createUI() {
 }
 
 function styleButton(btn, isTransparent = false) {
-    btn.style("width", "100px");
+    btn.style("width", "130px");
     btn.style("height", "30px");
     btn.style("padding", "0px");
     btn.style("font-size", "12px");
@@ -209,11 +221,12 @@ function styleButton(btn, isTransparent = false) {
 
 function positionButtons() {
     playButton.position(20, 20);
-    overlapButton.position(20, 60);
-    sphereButton.position(20, 100);
-    labelButton.position(20, 140);
-    resetButton.position(20, 180);
-    instructionsButton.position(20, 220);
+    spinButton.position(20, 60);
+    overlapButton.position(20, 100);
+    sphereButton.position(20, 140);
+    labelButton.position(20, 180);
+    resetButton.position(20, 220);
+    instructionsButton.position(20, 260);
 }
 
 function resetSimulation() {
@@ -238,6 +251,11 @@ function resetSimulation() {
         labelButton.html("Tắt nhãn");
     } else {
         labelButton.html("Bật nhãn");
+    }
+    if (isSpinning) {
+        spinButton.html("Tắt quay electron");
+    } else {
+        spinButton.html("Bật quay electron");
     }
 }
 
@@ -321,8 +339,8 @@ function draw() {
 function drawElectronClouds() {
     if (atoms.length < 3 || !atoms[0] || !atoms[1] || !atoms[2]) return;
 
-    const oOuterRadius = atoms[0].shellRadii[1] - 7;
-    const cOuterRadius = atoms[1].shellRadii[1] - 7;
+    const oOuterRadius = atoms[0].shellRadii[1] - 9;
+    const cOuterRadius = atoms[1].shellRadii[1] - 9;
     const cloudWidth = 15;
 
     const mixedColor = lerpColor(atoms[1].electronCol, atoms[0].electronCol, 0.5);
@@ -362,7 +380,7 @@ function drawElectronSpheres() {
     rotateY(cloudRotationAngle);
     noStroke();
     fill(atoms[0].electronCol);
-    sphere(oOrbitalRadius, 60, 60); // Đã cập nhật để làm nhẵn lớp cầu
+    sphere(oOrbitalRadius, 60, 60);
     pop();
 
     // Lớp cầu Carbon ở giữa
@@ -371,7 +389,7 @@ function drawElectronSpheres() {
     rotateY(cloudRotationAngle);
     noStroke();
     fill(atoms[1].electronCol);
-    sphere(cOrbitalRadius, 60, 60); // Đã cập nhật để làm nhẵn lớp cầu
+    sphere(cOrbitalRadius, 60, 60);
     pop();
 
     // Lớp cầu Oxygen bên phải
@@ -380,7 +398,7 @@ function drawElectronSpheres() {
     rotateY(cloudRotationAngle);
     noStroke();
     fill(atoms[2].electronCol);
-    sphere(oOrbitalRadius, 60, 60); // Đã cập nhật để làm nhẵn lớp cầu
+    sphere(oOrbitalRadius, 60, 60);
     pop();
 }
 
@@ -522,11 +540,15 @@ class Atom {
                 noStroke();
 
                 if (state === "idle" || state === "animating") {
-                    e.angle += slowSpinSpeed;
+                    if (isSpinning) {
+                        e.angle += slowSpinSpeed;
+                    }
                     ex = cos(e.angle) * radius;
                     ey = sin(e.angle) * radius;
                 } else if (state === "sphere_spinning_initial") {
-                    e.angle += slowSpinSpeed;
+                    if (isSpinning) {
+                        e.angle += slowSpinSpeed;
+                    }
                     ex = cos(e.angle) * radius;
                     ey = sin(e.angle) * radius;
                 } else {
@@ -604,7 +626,9 @@ class Atom {
                             }
                         }
                     } else {
-                        e.angle += this.electronSpinSpeeds[i];
+                        if (isSpinning) {
+                            e.angle += this.electronSpinSpeeds[i];
+                        }
                         ex = cos(e.angle) * radius;
                         ey = sin(e.angle) * radius;
                     }
