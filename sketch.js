@@ -1,6 +1,3 @@
-// Mô phỏng liên kết cộng hoá trị của phân tử CO2
-// Tác giả: Gemini
-
 let fontRegular;
 let playButton, resetButton, instructionsButton, overlapButton, sphereButton, labelButton, spinButton;
 let titleDiv, footerDiv, instructionsPopup;
@@ -11,6 +8,8 @@ let bondingProgress = 0;
 let cloudRotationAngle = 0;
 let showLabels = true; // Đặt true để nhãn hiển thị từ đầu
 let isSpinning = true; // Đặt true để electron quay từ đầu
+
+let showFixedLights = true; // nếu true thì hiển thị các nguồn sáng cố định (pointLight...), khi sphere bật => false
 
 const slowSpinSpeed = 0.025;
 const fastSpinSpeed = 0.15;
@@ -41,7 +40,7 @@ function setup() {
     textAlign(CENTER, CENTER);
     noStroke();
 
-    titleDiv = createDiv("MÔ PHỎNG LIÊN KẾT CỘNG HOÁ TRỊ CO₂");
+    titleDiv = createDiv("MÔ PHỎNG LIÊN KẾT CỘNG HOÁ TRỊ TRONG PHÂN TỬ CO₂");
     titleDiv.style("position", "absolute");
     titleDiv.style("top", "10px");
     titleDiv.style("width", "100%");
@@ -111,19 +110,25 @@ function createUI() {
     sphereButton = createButton("Bật lớp cầu");
     styleButton(sphereButton);
     sphereButton.mousePressed(() => {
+        // Khi bật lớp cầu => tắt các nguồn sáng cố định (showFixedLights = false)
+        // Khi tắt lớp cầu => bật lại các nguồn sáng cố định (showFixedLights = true)
         if (state === "done" || state === "overlap_spinning") {
             state = "sphere_spinning";
             sphereButton.html("Tắt lớp cầu");
             overlapButton.html("Bật xen phủ");
+            showFixedLights = false;
         } else if (state === "sphere_spinning") {
             state = "done";
             sphereButton.html("Bật lớp cầu");
+            showFixedLights = true;
         } else if (state === "idle") {
             state = "sphere_spinning_initial";
             sphereButton.html("Tắt lớp cầu");
+            showFixedLights = false;
         } else if (state === "sphere_spinning_initial") {
             state = "idle";
             sphereButton.html("Bật lớp cầu");
+            showFixedLights = true;
         }
     });
 
@@ -247,6 +252,7 @@ function resetSimulation() {
     panY = 0;
     overlapButton.html("Bật xen phủ");
     sphereButton.html("Bật lớp cầu");
+    showFixedLights = true; // reset lại để hiển thị nguồn sáng cố định theo mặc định
     if (showLabels) {
         labelButton.html("Tắt nhãn");
     } else {
@@ -283,8 +289,16 @@ function draw() {
 
     translate(panX, panY);
 
-    ambientLight(80);
-    pointLight(255, 255, 255, 0, 0, 300);
+    // Ambient base luôn có (tăng sáng nhẹ)
+    ambientLight(110);
+
+    // Các nguồn sáng cố định (ví dụ pointLight) chỉ hiển thị nếu showFixedLights === true
+    if (showFixedLights) {
+        // point light phía trên / trước để làm sáng cơ bản khi không bật lớp cầu
+        pointLight(255, 255, 255, 0, 0, 300);
+        // Thêm một pointLight phụ để tăng độ sáng nền nhẹ nhàng
+        pointLight(140, 140, 140, 0, -200, 200);
+    }
 
     if (state === "animating") {
         progress += 0.005;
@@ -371,6 +385,25 @@ function drawElectronClouds() {
 function drawElectronSpheres() {
     if (atoms.length < 3 || !atoms[0] || !atoms[1] || !atoms[2]) return;
 
+    // Apply lighting approach learned from File 1:
+    // - Slight ambient base (đã đặt trong draw())
+    // - Two moving directional lights with dynamic positions (độ sáng đã điều chỉnh nhẹ)
+    // - Use ambientMaterial and specularMaterial per-atom so the base color remains consistent
+
+    // TWO MOVING LIGHTS (dynamic highlights) - tăng nhẹ độ sáng so với lần trước
+    let aA = frameCount * 0.010;
+    let LAx = cos(aA) * 380;
+    let LAy = sin(aA) * 240;
+    directionalLight(155, 155, 155, LAx, LAy, -0.25); // tăng nhẹ hơn
+
+    let aB = frameCount * 0.018 + PI / 4;
+    let LBx = cos(aB) * 210;
+    let LBy = sin(aB) * 170;
+    directionalLight(115, 115, 115, -LBx, -LBy, 0.2); // tăng nhẹ hơn
+
+    // Higher shininess so highlights are visible but colors remain dominated by ambientMaterial
+    shininess(110);
+
     const cOrbitalRadius = cOuterRadius + 6;
     const oOrbitalRadius = oOuterRadius + 6;
     
@@ -379,7 +412,12 @@ function drawElectronSpheres() {
     translate(atoms[0].pos.x, atoms[0].pos.y, 0);
     rotateY(cloudRotationAngle);
     noStroke();
-    fill(atoms[0].electronCol);
+    // preserve the existing color of the sphere (atoms[0].electronCol)
+    const r0 = red(atoms[0].electronCol);
+    const g0 = green(atoms[0].electronCol);
+    const b0 = blue(atoms[0].electronCol);
+    ambientMaterial(r0, g0, b0);
+    specularMaterial(min(255, r0 + 45), min(255, g0 + 45), min(255, b0 + 45));
     sphere(oOrbitalRadius, 60, 60);
     pop();
 
@@ -388,7 +426,11 @@ function drawElectronSpheres() {
     translate(atoms[1].pos.x, atoms[1].pos.y, 0);
     rotateY(cloudRotationAngle);
     noStroke();
-    fill(atoms[1].electronCol);
+    const r1 = red(atoms[1].electronCol);
+    const g1 = green(atoms[1].electronCol);
+    const b1 = blue(atoms[1].electronCol);
+    ambientMaterial(r1, g1, b1);
+    specularMaterial(min(255, r1 + 45), min(255, g1 + 45), min(255, b1 + 45));
     sphere(cOrbitalRadius, 60, 60);
     pop();
 
@@ -397,7 +439,11 @@ function drawElectronSpheres() {
     translate(atoms[2].pos.x, atoms[2].pos.y, 0);
     rotateY(cloudRotationAngle);
     noStroke();
-    fill(atoms[2].electronCol);
+    const r2 = red(atoms[2].electronCol);
+    const g2 = green(atoms[2].electronCol);
+    const b2 = blue(atoms[2].electronCol);
+    ambientMaterial(r2, g2, b2);
+    specularMaterial(min(255, r2 + 45), min(255, g2 + 45), min(255, b2 + 45));
     sphere(oOrbitalRadius, 60, 60);
     pop();
 }
